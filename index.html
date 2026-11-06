@@ -1,0 +1,2115 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Akış Şeması Çalışma ve Çizim Aracı - BIL 103</title>
+    <style>
+        :root {
+            --bg: #090d16;
+            --surface: #0f172a;
+            --sidebar: #131d31;
+            --card: #1e293b;
+            --card-border: #334155;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --success: #10b981;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --grid-dot: #1e293b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; overscroll-behavior: none; }
+
+        /* HEADER */
+        header {
+            height: 55px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.25rem;
+            z-index: 50;
+        }
+
+        .logo-area { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-title { font-size: 1.1rem; font-weight: 700; color: #fff; }
+        .badge { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.3); padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+
+        .toolbar { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+        .tool-btn {
+            background: var(--card);
+            color: var(--text-main);
+            border: 1px solid var(--card-border);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover { background: #334155; border-color: var(--accent); color: var(--accent); }
+        .tool-btn.active { background: rgba(56, 189, 248, 0.2); border-color: var(--accent); color: var(--accent); }
+        .tool-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+        .tool-btn.success:hover { border-color: var(--success); color: var(--success); }
+        .tool-btn.audit-btn { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399; }
+        .tool-btn.audit-btn:hover { background: rgba(16, 185, 129, 0.25); border-color: #34d399; }
+
+        /* MAIN APP LAYOUT */
+        .workspace { flex: 1; display: flex; position: relative; overflow: hidden; }
+
+        /* SIDEBAR PALETTE */
+        .sidebar {
+            width: 250px;
+            background: var(--sidebar);
+            border-right: 1px solid var(--card-border);
+            display: flex;
+            flex-direction: column;
+            padding: 1rem 0.85rem;
+            gap: 1.25rem;
+            overflow-y: auto;
+            z-index: 40;
+        }
+
+        .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 0.6rem; }
+        .palette-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        .shape-item {
+            background: var(--surface);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.6rem 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+        .shape-item:hover { border-color: var(--accent); background: rgba(56, 189, 248, 0.08); transform: translateX(3px); }
+        .shape-item:active { cursor: grabbing; }
+
+        .shape-preview { width: 44px; height: 32px; display: flex; align-items: center; justify-content: center; }
+        .shape-info { display: flex; flex-direction: column; }
+        .shape-name { font-size: 0.85rem; font-weight: 600; color: #f1f5f9; }
+        .shape-desc { font-size: 0.72rem; color: var(--text-muted); }
+
+        .template-select {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            cursor: pointer;
+        }
+        .template-select:focus { outline: none; border-color: var(--accent); }
+
+        /* CANVAS AREA */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background-color: var(--bg);
+            background-image: radial-gradient(var(--grid-dot) 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            overflow: auto;
+            cursor: default;
+        }
+        .canvas-container.pan-mode { cursor: grab !important; }
+        .canvas-container.pan-mode:active { cursor: grabbing !important; }
+
+        #flowchartCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3200px;
+            height: 3200px;
+        }
+
+        #connectorSvg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .arrow-line { stroke: #94a3b8; stroke-width: 2.2; fill: none; pointer-events: stroke; cursor: pointer; transition: stroke 0.2s; }
+        .arrow-line:hover, .arrow-line.selected { stroke: #38bdf8; stroke-width: 3.5; }
+        .arrow-label { font-size: 11px; font-weight: bold; fill: #fbbf24; cursor: pointer; pointer-events: all; paint-order: stroke; stroke: #090d16; stroke-width: 4px; stroke-linejoin: round; }
+        .arrow-hit { stroke: transparent; stroke-width: 14; fill: none; pointer-events: stroke; cursor: pointer; }
+        .arrow-handle { fill: #38bdf8; stroke: #0f172a; stroke-width: 2; cursor: move; pointer-events: all; }
+        .arrow-handle:hover { fill: #34d399; }
+        .canvas-container.free-mode { cursor: crosshair; }
+
+        /* SHAPE DOM NODES */
+        .flow-node {
+            position: absolute;
+            z-index: 20;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: box-shadow 0.15s;
+        }
+        .flow-node.selected svg path,
+        .flow-node.selected svg rect,
+        .flow-node.selected svg polygon,
+        .flow-node.selected svg circle {
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 6px var(--accent));
+        }
+
+        .flow-text {
+            position: absolute;
+            width: 80%;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #f8fafc;
+            line-height: 1.25;
+            word-break: break-word;
+            white-space: pre-line;
+            pointer-events: none;
+        }
+
+        .port {
+            position: absolute;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            background: #38bdf8;
+            border: 2px solid #0f172a;
+            opacity: 0;
+            cursor: crosshair;
+            transition: opacity 0.15s, transform 0.15s;
+            z-index: 30;
+        }
+        .flow-node:hover .port { opacity: 0.9; }
+        .port:hover { opacity: 1; transform: scale(1.35); background: #34d399; }
+
+        .port-top { top: -5px; left: calc(50% - 5.5px); }
+        .port-bottom { bottom: -5px; left: calc(50% - 5.5px); }
+        .port-left { left: -5px; top: calc(50% - 5.5px); }
+        .port-right { right: -5px; top: calc(50% - 5.5px); }
+
+        /* PROPERTY INSPECTOR DRAWER */
+        .inspector {
+            width: 260px;
+            background: var(--sidebar);
+            border-left: 1px solid var(--card-border);
+            display: flex;
+            flex-direction: column;
+            padding: 1rem 0.85rem;
+            gap: 1.25rem;
+            z-index: 40;
+        }
+
+        .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+        .form-label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+        .form-input {
+            background: var(--surface);
+            border: 1px solid var(--card-border);
+            color: #fff;
+            padding: 0.5rem 0.65rem;
+            border-radius: 6px;
+            font-size: 0.88rem;
+        }
+        .form-input:focus { outline: none; border-color: var(--accent); }
+        textarea.form-input { resize: vertical; min-height: 65px; line-height: 1.4; }
+
+        
+        /* FLOATING TOAST NOTIFICATION */
+        .toast-container {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .toast-msg {
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid var(--danger);
+            border-left: 5px solid var(--danger);
+            padding: 0.65rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            animation: slideDown 0.25s ease-out;
+            pointer-events: all;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* MODAL FOR FLOWCHART AUDIT */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(9, 13, 22, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-card {
+            background: var(--surface);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 580px;
+            padding: 1.75rem;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+            animation: fadeIn 0.2s ease-out;
+        }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem; }
+        .modal-title { font-size: 1.2rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+        .modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; }
+        .modal-close:hover { color: #fff; }
+
+        .audit-list { display: flex; flex-direction: column; gap: 0.65rem; max-height: 380px; overflow-y: auto; padding-right: 0.4rem; }
+        .audit-item {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+        .audit-item.success { border-left: 4px solid var(--success); }
+        .audit-item.error { border-left: 4px solid var(--danger); }
+        .audit-item.warning { border-left: 4px solid var(--warning); }
+        .audit-icon { font-size: 1.15rem; line-height: 1; }
+        .audit-content { display: flex; flex-direction: column; gap: 0.2rem; }
+        .audit-title { font-size: 0.9rem; font-weight: 600; color: #f8fafc; }
+        .audit-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+
+        input, textarea { user-select: text; -webkit-user-select: text; }
+        .modal-card { max-height: 92vh; overflow-y: auto; }
+        .run-section { margin-top: 1rem; border-top: 1px solid var(--card-border); padding-top: 1rem; }
+        .run-title { font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 0.6rem; }
+        .run-inputs { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.7rem; }
+        .run-inputs label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+        .run-inputs input { width: 90px; }
+        .run-output { background: #050810; border: 1px solid var(--card-border); border-radius: 8px; padding: 0.75rem; margin-top: 0.7rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; color: #a7f3d0; white-space: pre-wrap; min-height: 2.6rem; max-height: 200px; overflow-y: auto; user-select: text; }
+        .run-output.err { color: #fca5a5; }
+        .run-vars { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem; user-select: text; }
+
+        /* HINT BAR */
+        .hint-bar {
+            background: rgba(15, 23, 42, 0.95);
+            border-top: 1px solid var(--card-border);
+            padding: 0.4rem 1.25rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 50;
+        }
+    
+        /* ---- DOKUNMATİK & MOBİL ---- */
+        .mobile-only { display: none; }
+        .canvas-container { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+        .flow-node, .port { touch-action: none; }
+        #connectorSvg { touch-action: none; }
+        .canvas-container.pan-mode .flow-node, .canvas-container.pan-mode .port { touch-action: auto; }
+        .inspector > * { flex-shrink: 0; }
+        .zoom-label { font-size: 0.78rem; font-weight: 700; color: var(--text-muted); min-width: 2.6rem; text-align: center; }
+
+        @media (pointer: coarse) {
+            .port { width: 22px; height: 22px; }
+            .port-top { top: -11px; left: calc(50% - 11px); }
+            .port-bottom { bottom: -11px; left: calc(50% - 11px); }
+            .port-left { left: -11px; top: calc(50% - 11px); }
+            .port-right { right: -11px; top: calc(50% - 11px); }
+            .flow-node.selected .port { opacity: 0.95; }
+            .tool-btn { padding: 0.55rem 0.85rem; }
+            .arrow-hit { stroke-width: 26; }
+        }
+
+        @media (max-width: 820px) {
+            header { height: auto; flex-direction: column; align-items: stretch; gap: 0.4rem; padding: calc(0.4rem + env(safe-area-inset-top)) 0.6rem 0.4rem; }
+            .logo-area { justify-content: space-between; gap: 0.5rem; }
+            .logo-title { font-size: 1rem; }
+            .badge { display: none; }
+            .mobile-only { display: flex; }
+            .toolbar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+            .toolbar::-webkit-scrollbar { display: none; }
+            .tool-btn { white-space: nowrap; flex-shrink: 0; }
+            .sidebar { position: absolute; top: 0; bottom: 0; left: 0; width: min(290px, 86vw); transform: translateX(-103%); transition: transform 0.22s ease; box-shadow: 8px 0 30px rgba(0,0,0,0.5); }
+            .sidebar.open { transform: none; }
+            .inspector { position: absolute; left: 0; right: 0; bottom: 0; width: auto; max-height: 42%; overflow-y: auto; border-left: none; border-top: 1px solid var(--card-border); transform: translateY(103%); transition: transform 0.22s ease; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); box-shadow: 0 -8px 30px rgba(0,0,0,0.5); }
+            .inspector.open { transform: none; }
+            .hint-bar { display: none; }
+            .form-input, .template-select { font-size: 16px; }
+            .modal-card { padding: 1.1rem; margin: 0 0.6rem; }
+            .toast-msg { max-width: 92vw; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <span class="logo-title">Akış Şeması Çalışma Aracı</span>
+            <span class="badge">BIL 103 Sınav Hazırlık</span>
+            <button class="tool-btn mobile-only" onclick="toggleSidebar()">☰ Şekiller</button>
+        </div>
+        <div class="toolbar">
+            <!-- Geri Al / İleri Al -->
+            <button class="tool-btn" onclick="undo()" title="Geri Al (Cmd+Z / Ctrl+Z)">
+                ↶ Geri Al
+            </button>
+            <button class="tool-btn" onclick="redo()" title="İleri Al (Cmd+Shift+Z / Ctrl+Y)">
+                ↷ İleri Al
+            </button>
+
+            <!-- Serbest Gezinme (Pan / El Aracı) -->
+            <button class="tool-btn" id="panToolBtn" onclick="togglePanMode()" title="Çalışma alanını mouse ile sürükleyerek gezinin (Boşluk tuşuna basılı tutarak da yapabilirsiniz)">
+                ✋ Gezin (Pan)
+            </button>
+
+            <button class="tool-btn" id="freeToolBtn" onclick="toggleFreeMode()" title="Açıkken bağlantı çizerken boş alana tıklayarak köşe noktaları ekleyebilirsiniz (Alt: serbest açı, Esc: iptal)">
+                ✏️ Serbest Bağlantı
+            </button>
+            <button class="tool-btn" id="snapToolBtn" onclick="toggleSnap()" title="Şekilleri ve köşe noktalarını ızgaraya hizala">
+                ▦ Izgara
+            </button>
+            <button class="tool-btn" onclick="zoomBy(1/1.2)" title="Uzaklaştır">−</button>
+            <span class="zoom-label" id="zoomLabel">100%</span>
+            <button class="tool-btn" onclick="zoomBy(1.2)" title="Yakınlaştır">+</button>
+            <button class="tool-btn" onclick="fitView()" title="Şemayı ekrana sığdır">⤢ Sığdır</button>
+
+            <!-- Hata Denetimi -->
+            <button class="tool-btn audit-btn" onclick="runFlowchartAudit()" title="Diyagramınızdaki mantık ve standart kural hatalarını kontrol eder">
+                🔍 Şemayı Denetle
+            </button>
+
+            <button class="tool-btn danger" onclick="deleteSelected()" title="Seçileni sil (Delete)">
+                🗑️ Sil
+            </button>
+            <button class="tool-btn" onclick="clearCanvas()" title="Tuvali temizle">
+                🧹 Temizle
+            </button>
+            <button class="tool-btn success" onclick="exportDiagram()" title="Diyagramı PNG olarak indir">
+                📷 PNG Kaydet
+            </button>
+        </div>
+    </header>
+
+    <div class="workspace">
+
+        <!-- SOL ŞEKİL MENÜSÜ -->
+        <aside class="sidebar">
+            <div>
+                <div class="section-title">Akış Şeması Sembolleri</div>
+                <div class="palette-grid">
+                    
+                    <div class="shape-item" draggable="true" ondragstart="dragStart(event, 'terminal')" ondragend="dragEnd(event)" onclick="addShapeAtCenter('terminal')">
+                        <div class="shape-preview">
+                            <svg width="42" height="24" viewBox="0 0 120 40">
+                                <rect x="2" y="2" width="116" height="36" rx="18" fill="#082f49" stroke="#38bdf8" stroke-width="3"/>
+                            </svg>
+                        </div>
+                        <div class="shape-info">
+                            <span class="shape-name">Başla / Dur</span>
+                            <span class="shape-desc">Terminal (Elips)</span>
+                        </div>
+                    </div>
+
+                    <div class="shape-item" draggable="true" ondragstart="dragStart(event, 'input')" ondragend="dragEnd(event)" onclick="addShapeAtCenter('input')">
+                        <div class="shape-preview">
+                            <svg width="42" height="24" viewBox="0 0 120 40">
+                                <polygon points="20,3 116,3 100,37 4,37" fill="#451a03" stroke="#fbbf24" stroke-width="3"/>
+                            </svg>
+                        </div>
+                        <div class="shape-info">
+                            <span class="shape-name">Giriş / Oku</span>
+                            <span class="shape-desc">Paralelkenar</span>
+                        </div>
+                    </div>
+
+                    <div class="shape-item" draggable="true" ondragstart="dragStart(event, 'process')" ondragend="dragEnd(event)" onclick="addShapeAtCenter('process')">
+                        <div class="shape-preview">
+                            <svg width="42" height="24" viewBox="0 0 120 40">
+                                <rect x="4" y="3" width="112" height="34" fill="#064e3b" stroke="#10b981" stroke-width="3"/>
+                            </svg>
+                        </div>
+                        <div class="shape-info">
+                            <span class="shape-name">İşlem / Hesap</span>
+                            <span class="shape-desc">Dikdörtgen</span>
+                        </div>
+                    </div>
+
+                    <div class="shape-item" draggable="true" ondragstart="dragStart(event, 'decision')" ondragend="dragEnd(event)" onclick="addShapeAtCenter('decision')">
+                        <div class="shape-preview">
+                            <svg width="42" height="26" viewBox="0 0 120 48">
+                                <polygon points="60,2 116,24 60,46 4,24" fill="#4c0519" stroke="#f87171" stroke-width="3"/>
+                            </svg>
+                        </div>
+                        <div class="shape-info">
+                            <span class="shape-name">Karar / Koşul</span>
+                            <span class="shape-desc">Eşkenar Dörtgen</span>
+                        </div>
+                    </div>
+
+                    <div class="shape-item" draggable="true" ondragstart="dragStart(event, 'loop')" ondragend="dragEnd(event)" onclick="addShapeAtCenter('loop')">
+                        <div class="shape-preview">
+                            <svg width="42" height="24" viewBox="0 0 120 40">
+                                <polygon points="16,3 104,3 116,20 104,37 16,37 4,20" fill="#3b0764" stroke="#c084fc" stroke-width="3"/>
+                            </svg>
+                        </div>
+                        <div class="shape-info">
+                            <span class="shape-name">Döngü (Sayaç)</span>
+                            <span class="shape-desc">Altıgen</span>
+                        </div>
+                    </div>
+
+                    <div class="shape-item" draggable="true" ondragstart="dragStart(event, 'output')" ondragend="dragEnd(event)" onclick="addShapeAtCenter('output')">
+                        <div class="shape-preview">
+                            <svg width="42" height="24" viewBox="0 0 120 44">
+                                <path d="M4,3 L116,3 L116,33 Q87,45 60,33 Q33,21 4,33 Z" fill="#4a044e" stroke="#f472b6" stroke-width="3"/>
+                            </svg>
+                        </div>
+                        <div class="shape-info">
+                            <span class="shape-name">Yazdır (Çıktı)</span>
+                            <span class="shape-desc">Dalgalı Belge</span>
+                        </div>
+                    </div>
+
+                    <div class="shape-item" draggable="true" ondragstart="dragStart(event, 'connector')" ondragend="dragEnd(event)" onclick="addShapeAtCenter('connector')">
+                        <div class="shape-preview">
+                            <svg width="30" height="30" viewBox="0 0 50 50">
+                                <circle cx="25" cy="25" r="20" fill="#1e293b" stroke="#f8fafc" stroke-width="3"/>
+                            </svg>
+                        </div>
+                        <div class="shape-info">
+                            <span class="shape-name">Bağlantı</span>
+                            <span class="shape-desc">Daire</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">Hazır Sınav Şablonları</div>
+                <select class="template-select" onchange="handleTemplateChange(this)">
+                    <option value="">-- Şablon Seç ve Yükle --</option>
+                    <option value="quad">1. İkinci Derece Denklem (ax²+bx+c)</option>
+                    <option value="fact">2. Faktöriyel Hesabı (N!)</option>
+                    <option value="evenodd">3. Tek / Çift Sayı Bulma</option>
+                    <option value="nested">4. İç İçe Döngü (SUBÜ 2024 Vize)</option>
+                </select>
+            </div>
+        </aside>
+
+        <!-- ÇALIŞMA ALANI (CANVAS) -->
+        <main class="canvas-container" id="canvasContainer" 
+              ondragover="handleDragOver(event)" ondragenter="handleDragOver(event)" ondrop="dropShape(event)">
+            <div id="flowchartCanvas" 
+                 ondragover="handleDragOver(event)" ondragenter="handleDragOver(event)" ondrop="dropShape(event)">
+                <svg id="connectorSvg">
+                    <defs>
+                        <marker id="arrowHead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
+                        </marker>
+                        <marker id="arrowHeadActive" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+        </main>
+
+        <!-- SAĞ ÖZELLİK VE METİN DÜZENLEYİCİ -->
+        <aside class="inspector">
+            <div style="display:flex; align-items:center; justify-content:space-between;"><div class="section-title" style="margin-bottom:0;">Seçili Öğe Özellikleri</div><button class="tool-btn mobile-only" style="padding:0.25rem 0.65rem;" onclick="deselectAll()">✕</button></div>
+            
+            <div id="nodeInspector">
+                <div class="form-group">
+                    <label class="form-label">Şekil İçi Yazı / Metin:</label>
+                    <textarea class="form-input" id="nodeTextInput" placeholder="Yazı yazın..." oninput="updateSelectedText()" onfocus="textDirty=false"></textarea>
+                </div>
+
+                <div class="form-group" style="margin-top: 0.8rem;">
+                    <label class="form-label">Şekil Tipi:</label>
+                    <input type="text" class="form-input" id="nodeTypeInput" readonly style="opacity: 0.7;">
+                </div>
+
+                <div class="form-group" style="margin-top: 0.8rem;">
+                    <label class="form-label">Hızlı Bağlantı:</label>
+                    <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+                        Şeklin kenarındaki <strong>mavi noktalardan</strong> basıp diğer şekle sürükleyerek ok oluşturabilirsiniz. <strong>Serbest Bağlantı</strong> açıkken boş alana tıklayarak köşe noktaları ekleyebilirsiniz.
+                    </p>
+                </div>
+            </div>
+
+            <div id="edgeInspector" style="display:none;">
+                <div class="form-group" style="margin-bottom:0.9rem;">
+                    <label class="form-label">Bağlantı Yolu:</label>
+                    <button class="tool-btn" onclick="editCornersSelected()">✏️ Köşeleri Serbest Düzenle</button>
+                    <button class="tool-btn" onclick="resetCornersSelected()">↺ Otomatik Yola Dön</button>
+                    <p style="font-size:0.72rem; color:var(--text-muted); line-height:1.4;">Serbest yolda <strong>mavi noktaları</strong> sürükleyerek köşeleri taşıyabilirsiniz.</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Bağlantı Oku Etiketi:</label>
+                    <div style="display:flex; gap:0.4rem;">
+                        <button class="tool-btn" style="flex:1;" onclick="setArrowLabel('Evet')">Evet (E)</button>
+                        <button class="tool-btn" style="flex:1;" onclick="setArrowLabel('Hayır')">Hayır (H)</button>
+                    </div>
+                    <input type="text" class="form-input" id="arrowTextInput" placeholder="Örn: Evet, Hayır..." style="margin-top:0.4rem;" oninput="updateSelectedArrowText()" onfocus="textDirty=false">
+                </div>
+            </div>
+
+            <div id="emptyInspector" style="color:var(--text-muted); font-size:0.85rem; line-height:1.5;">
+                Düzenlemek için tuval üzerindeki bir <strong>şekle</strong> veya <strong>bağlantı okuna</strong> tıklayın.
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- HATA VE KURAL DENETİMİ MODALİ -->
+    <div class="modal-overlay" id="auditModal" onclick="closeAuditModal(event)">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span>🔍</span> Akış Şeması Kural & Mantık Denetimi
+                </div>
+                <button class="modal-close" onclick="closeAuditModal()">&times;</button>
+            </div>
+            <div class="audit-list" id="auditResultsList">
+                <!-- Denetim sonuçları dinamik eklenir -->
+            </div>
+            <div id="runSection" class="run-section"></div>
+        </div>
+    </div>
+
+    <!-- ALT BİLGİ VE İPUCU BARI -->
+    <div class="hint-bar">
+        <span>💡 <strong>İpuçları:</strong> <strong>[Boşluk Tuşu]</strong> ile tuvali serbestçe sürükleyebilir, <strong>[Geri Al]</strong> ile işlemleri geri alabilir, <strong>[Şemayı Denetle]</strong> ile mantık hatalarını kontrol edebilirsiniz.</span>
+        <span>Kısayollar: <strong>Cmd+Z</strong> Geri Al | <strong>Delete</strong> Sil | <strong>Esc</strong> Bağlantıyı iptal | <strong>Alt</strong> Serbest açı</span>
+    </div>
+
+    <script>
+        let nodes = [];
+        let connections = [];
+        let selectedNodeId = null;
+        let selectedConnectionId = null;
+        let nodeCounter = 1;
+        let connectionCounter = 1;
+
+        // UNDO / REDO HISTORY STACKS
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_HISTORY = 40;
+
+        function saveState() {
+            const state = JSON.stringify({
+                nodes: nodes,
+                connections: connections,
+                nodeCounter: nodeCounter,
+                connectionCounter: connectionCounter
+            });
+            undoStack.push(state);
+            if (undoStack.length > MAX_HISTORY) undoStack.shift();
+            redoStack = []; // Clear redo on new action
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            const currentState = JSON.stringify({
+                nodes: nodes,
+                connections: connections,
+                nodeCounter: nodeCounter,
+                connectionCounter: connectionCounter
+            });
+            redoStack.push(currentState);
+
+            const prevState = JSON.parse(undoStack.pop());
+            restoreState(prevState);
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            const currentState = JSON.stringify({
+                nodes: nodes,
+                connections: connections,
+                nodeCounter: nodeCounter,
+                connectionCounter: connectionCounter
+            });
+            undoStack.push(currentState);
+
+            const nextState = JSON.parse(redoStack.pop());
+            restoreState(nextState);
+        }
+
+        function restoreState(state) {
+            nodes = state.nodes;
+            connections = state.connections;
+            nodeCounter = state.nodeCounter;
+            connectionCounter = state.connectionCounter;
+            selectedNodeId = null;
+            selectedConnectionId = null;
+
+            canvas.querySelectorAll('.flow-node').forEach(el => el.remove());
+            nodes.forEach(n => createNodeElement(n));
+            renderConnections();
+            updateInspector();
+        }
+
+        // CANVAS PAN (SERBEST GEZİNME / EL ARACI)
+        let isPanMode = false;
+        let isSpacePressed = false;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panScrollLeft = 0;
+        let panScrollTop = 0;
+
+        const canvas = document.getElementById('flowchartCanvas');
+        const container = document.getElementById('canvasContainer');
+        const connectorSvg = document.getElementById('connectorSvg');
+
+        function togglePanMode() {
+            isPanMode = !isPanMode;
+            document.getElementById('panToolBtn').classList.toggle('active', isPanMode);
+            container.classList.toggle('pan-mode', isPanMode || isSpacePressed);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+            if (isConnecting) { handleConnectingKey(e); return; }
+            if (e.code === 'Space') e.preventDefault();
+
+            // Spacebar for quick panning
+            if (e.code === 'Space' && !isSpacePressed) {
+                isSpacePressed = true;
+                container.classList.add('pan-mode');
+            }
+
+            // Undo / Redo shortcuts (Cmd/Ctrl + Z, Cmd/Ctrl + Shift + Z / Y)
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) redo();
+                else undo();
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault();
+                redo();
+            }
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                deleteSelected();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                isSpacePressed = false;
+                if (!isPanMode) container.classList.remove('pan-mode');
+            }
+        });
+
+        // Mouse pan on canvasContainer
+        container.addEventListener('mousedown', (e) => {
+            // Enable panning if Pan Mode active, Space held, or middle mouse clicked (button === 1), or clicked directly on empty canvas
+            if (!isConnecting && (isPanMode || isSpacePressed || e.button === 1 || e.target === container || e.target === canvas || e.target === connectorSvg)) {
+                if (e.button === 0 || e.button === 1) { // Left or Middle click
+                    isPanning = true;
+                    panStartX = e.clientX;
+                    panStartY = e.clientY;
+                    panScrollLeft = container.scrollLeft;
+                    panScrollTop = container.scrollTop;
+                    container.classList.add('pan-mode');
+                }
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            const dx = e.clientX - panStartX;
+            const dy = e.clientY - panStartY;
+            container.scrollLeft = panScrollLeft - dx;
+            container.scrollTop = panScrollTop - dy;
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isPanning) {
+                isPanning = false;
+                if (!isPanMode && !isSpacePressed) {
+                    container.classList.remove('pan-mode');
+                }
+            }
+        });
+
+        // SHAPE CONFIGS
+        const shapeConfigs = {
+            terminal: {
+                w: 140, h: 48,
+                defaultText: 'Başla',
+                type: 'Başla / Dur',
+                renderSvg: (w, h) => `<rect x="2" y="2" width="${w-4}" height="${h-4}" rx="${(h-4)/2}" fill="#082f49" stroke="#38bdf8" stroke-width="2.5"/>`
+            },
+            input: {
+                w: 150, h: 48,
+                defaultText: 'Oku A, B',
+                type: 'Veri Girişi',
+                renderSvg: (w, h) => `<polygon points="20,2 ${w-4},2 ${w-24},${h-2} 4,${h-2}" fill="#451a03" stroke="#fbbf24" stroke-width="2.5"/>`
+            },
+            process: {
+                w: 150, h: 48,
+                defaultText: 'C = A + B',
+                type: 'İşlem',
+                renderSvg: (w, h) => `<rect x="2" y="2" width="${w-4}" height="${h-4}" fill="#064e3b" stroke="#10b981" stroke-width="2.5"/>`
+            },
+            decision: {
+                w: 140, h: 64,
+                defaultText: 'A > B ?',
+                type: 'Karar (Koşul)',
+                renderSvg: (w, h) => `<polygon points="${w/2},2 ${w-2},${h/2} ${w/2},${h-2} 2,${h/2}" fill="#4c0519" stroke="#f87171" stroke-width="2.5"/>`
+            },
+            loop: {
+                w: 150, h: 48,
+                defaultText: 'i = 1, N, 1',
+                type: 'Döngü',
+                renderSvg: (w, h) => `<polygon points="18,2 ${w-18},2 ${w-2},${h/2} ${w-18},${h-2} 18,${h-2} 2,${h/2}" fill="#3b0764" stroke="#c084fc" stroke-width="2.5"/>`
+            },
+            output: {
+                w: 150, h: 52,
+                defaultText: 'Yaz Sonuc',
+                type: 'Çıktı (Yaz)',
+                renderSvg: (w, h) => `<path d="M2,2 L${w-2},2 L${w-2},${h-14} Q${w*0.75},${h} ${w*0.5},${h-12} Q${w*0.25},${h-24} 2,${h-12} Z" fill="#4a044e" stroke="#f472b6" stroke-width="2.5"/>`
+            },
+            connector: {
+                w: 48, h: 48,
+                defaultText: '1',
+                type: 'Bağlantı',
+                renderSvg: (w, h) => `<circle cx="${w/2}" cy="${h/2}" r="${(w/2)-2}" fill="#1e293b" stroke="#f8fafc" stroke-width="2.5"/>`
+            }
+        };
+
+        function addShape(type, x, y, customText = null, shouldSave = true) {
+            const config = shapeConfigs[type];
+            if (!config) return;
+
+            if (shouldSave) saveState();
+
+            const id = 'node_' + (nodeCounter++);
+            const nodeData = {
+                id,
+                type,
+                x,
+                y,
+                w: config.w,
+                h: config.h,
+                text: customText !== null ? customText : config.defaultText
+            };
+            nodes.push(nodeData);
+
+            createNodeElement(nodeData);
+            selectNode(id);
+            renderConnections();
+            return nodeData;
+        }
+
+        function addShapeAtCenter(type) {
+            closeSidebar();
+            const scrollLeft = container.scrollLeft;
+            const scrollTop = container.scrollTop;
+            const viewW = container.clientWidth;
+            const viewH = container.clientHeight;
+            const off = (addCount++ % 6) * 22;
+            const x = (scrollLeft + viewW / 2) / zoom - 75 + off;
+            const y = (scrollTop + viewH / 2) / zoom - 25 + off;
+            addShape(type, x, y);
+        }
+
+        function createNodeElement(node) {
+            const config = shapeConfigs[node.type];
+            const el = document.createElement('div');
+            el.className = 'flow-node';
+            el.id = node.id;
+            el.style.left = node.x + 'px';
+            el.style.top = node.y + 'px';
+            el.style.width = node.w + 'px';
+            el.style.height = node.h + 'px';
+
+            el.innerHTML = `
+                <svg width="${node.w}" height="${node.h}" viewBox="0 0 ${node.w} ${node.h}">
+                    ${config.renderSvg(node.w, node.h)}
+                </svg>
+                <div class="flow-text"></div>
+                <div class="port port-top" data-port="top" onpointerdown="startPortDrag(event, '${node.id}', 'top')"></div>
+                <div class="port port-bottom" data-port="bottom" onpointerdown="startPortDrag(event, '${node.id}', 'bottom')"></div>
+                <div class="port port-left" data-port="left" onpointerdown="startPortDrag(event, '${node.id}', 'left')"></div>
+                <div class="port port-right" data-port="right" onpointerdown="startPortDrag(event, '${node.id}', 'right')"></div>
+            `;
+
+            el.addEventListener('pointerdown', (e) => {
+                if (e.target.classList.contains('port') || isPanMode || isSpacePressed || isConnecting) return;
+                selectNode(node.id);
+                initNodeDrag(e, node);
+            });
+
+            el.addEventListener('dblclick', () => {
+                const newText = prompt('Şekil içindeki metni girin:', node.text);
+                if (newText !== null && newText !== node.text) {
+                    saveState();
+                    node.text = newText;
+                    el.querySelector('.flow-text').textContent = newText;
+                    updateInspector();
+                }
+            });
+
+            el.querySelector('.flow-text').textContent = node.text;
+            canvas.appendChild(el);
+        }
+
+        // DRAG & DROP FROM SIDEBAR
+        let currentDraggedType = null;
+
+        function dragStart(e, type) {
+            currentDraggedType = type;
+            e.dataTransfer.effectAllowed = 'copy';
+            try {
+                e.dataTransfer.setData('text/plain', type);
+                e.dataTransfer.setData('shapeType', type);
+            } catch(err) {}
+        }
+
+        function dragEnd(e) {
+            currentDraggedType = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                e.dataTransfer.dropEffect = 'copy';
+            } catch(err) {}
+        }
+
+        function dropShape(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            let type = null;
+            try {
+                type = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('shapeType');
+            } catch(err) {}
+            
+            if (!type && currentDraggedType) {
+                type = currentDraggedType;
+            }
+
+            if (type && shapeConfigs[type]) {
+                const rect = canvas.getBoundingClientRect();
+                const x = Math.max(20, Math.round(toCanvas(e).x - (shapeConfigs[type].w / 2)));
+                const y = Math.max(20, Math.round(toCanvas(e).y - (shapeConfigs[type].h / 2)));
+                addShape(type, x, y);
+            }
+            currentDraggedType = null;
+        }
+
+        // NODE DRAGGING ON CANVAS
+        function initNodeDrag(e, node) {
+            e.preventDefault();
+            let startX = e.clientX;
+            let startY = e.clientY;
+            let initialNodeX = node.x;
+            let initialNodeY = node.y;
+            let hasMoved = false;
+
+            function onMouseMove(moveEvent) {
+                const dx = (moveEvent.clientX - startX) / zoom;
+                const dy = (moveEvent.clientY - startY) / zoom;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                    if (!hasMoved) {
+                        saveState(); // Save state once when movement starts
+                        hasMoved = true;
+                    }
+                }
+                node.x = Math.min(3190 - node.w, Math.max(10, snap(initialNodeX + dx)));
+                node.y = Math.min(3190 - node.h, Math.max(10, snap(initialNodeY + dy)));
+
+                const el = document.getElementById(node.id);
+                if (el) {
+                    el.style.left = node.x + 'px';
+                    el.style.top = node.y + 'px';
+                }
+                renderConnections();
+            }
+
+            function onMouseUp() {
+                window.removeEventListener('pointermove', onMouseMove);
+                window.removeEventListener('pointerup', onMouseUp);
+                window.removeEventListener('pointercancel', onMouseUp);
+            }
+
+            window.addEventListener('pointermove', onMouseMove);
+            window.addEventListener('pointerup', onMouseUp);
+            window.addEventListener('pointercancel', onMouseUp);
+        }
+
+        
+                // TOAST NOTIFICATIONS
+        function showToast(msg, isError = true) {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast-msg';
+            if (!isError) {
+                toast.style.borderColor = 'var(--success)';
+                toast.style.borderLeftColor = 'var(--success)';
+            }
+            const icon = isError ? '⚠️' : '✅';
+            toast.innerHTML = '<span style="font-size:1.1rem;">' + icon + '</span> <span>' + msg + '</span>';
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // AKIŞ ŞEMASI BAĞLANTI KURALLARI DENETLEYİCİSİ
+        function validateConnectionRules(fromId, toId) {
+            if (fromId === toId) {
+                return 'Bir şekil doğrudan kendisine bağlanamaz.';
+            }
+
+            // Aynı iki şekil arasında zaten ok var mı?
+            const alreadyConnected = connections.some(c => c.from === fromId && c.to === toId);
+            if (alreadyConnected) {
+                return 'Bu iki şekil arasında zaten bir bağlantı oku mevcut.';
+            }
+
+            const fromNode = nodes.find(n => n.id === fromId);
+            const toNode = nodes.find(n => n.id === toId);
+            if (!fromNode || !toNode) return 'Geçersiz düğüm.';
+
+            // Hedef "Başla" ise ok bağlanamaz
+            if (toNode.type === 'terminal' && /başla|start/i.test(toNode.text)) {
+                return '"Başla" sembolüne dışarıdan akış oku bağlanamaz.';
+            }
+
+            // Çıkış yapan şeklin mevcut çıkış sayısı
+            const outgoingCount = connections.filter(c => c.from === fromId).length;
+
+            // 1. "Dur" sembolünden dışarıya ok çıkamaz
+            if (fromNode.type === 'terminal' && /dur|bitir|end/i.test(fromNode.text)) {
+                return '"Dur" (bitiş) sembolünden dışarıya ok çıkarılamaz.';
+            }
+
+            // 2. "Başla" sembolünden en fazla 1 ok çıkabilir
+            if (fromNode.type === 'terminal' && /başla|start/i.test(fromNode.text)) {
+                if (outgoingCount >= 1) {
+                    return '"Başla" sembolünden yalnızca 1 adet çıkış oku çıkabilir.';
+                }
+            }
+
+            // 3. Karar (Eşkenar Dörtgen) sembolünden en fazla 2 ok çıkabilir (Evet ve Hayır)
+            if (fromNode.type === 'decision') {
+                if (outgoingCount >= 2) {
+                    return 'Karar (eşkenar dörtgen) sembolünden en fazla 2 çıkış oku (Evet ve Hayır) çıkabilir.';
+                }
+            }
+
+            // 4. Döngü (Altıgen) sembolünden en fazla 2 ok çıkabilir (Gövde ve Çıkış)
+            else if (fromNode.type === 'loop') {
+                if (outgoingCount >= 2) {
+                    return 'Döngü (altıgen) sembolünden en fazla 2 çıkış oku çıkabilir.';
+                }
+            }
+
+            // 5. İşlem, Veri Girişi, Çıktı ve Bağlantı sembollerinden YALNIZCA 1 ok çıkabilir!
+            else {
+                if (outgoingCount >= 1) {
+                    const typeName = shapeConfigs[fromNode.type].type;
+                    return typeName + ' sembolünden yalnızca 1 adet çıkış oku çıkabilir (dallanma yapılamaz).';
+                }
+            }
+
+            return null; // Kurala uygun
+        }
+
+        // ARROW CONNECTIONS
+        let isConnecting = false;
+        let connectSourceNode = null;
+        let connectSourcePort = null;
+        let tempLine = null;
+        let isFreeMode = false, snapOn = false, freeHintShown = false, textDirty = false;
+        let connectPoints = [], connectCursor = null, connectAlt = false, connectCleanup = null;
+
+        function startPortDrag(e, nodeId, portPos) {
+            e.stopPropagation();
+            e.preventDefault();
+
+            const fromNode = nodes.find(n => n.id === nodeId);
+            if (fromNode) {
+                // Ön kontrol: Dur'dan ok çıkamaz
+                if (fromNode.type === 'terminal' && /dur|bitir|end/i.test(fromNode.text)) {
+                    showToast('Dur (bitiş) sembolünden dışarıya ok çıkarılamaz.');
+                    return;
+                }
+                // Çıkış limiti kontrolü
+                const outgoingCount = connections.filter(c => c.from === nodeId).length;
+                if ((fromNode.type === 'decision' || fromNode.type === 'loop') && outgoingCount >= 2) {
+                    showToast('Bu karar/döngü sembolünün 2 çıkış kolu zaten bağlanmış.');
+                    return;
+                } else if (fromNode.type !== 'decision' && fromNode.type !== 'loop' && outgoingCount >= 1) {
+                    showToast('Bu sembolden yalnızca 1 adet çıkış oku çıkabilir.');
+                    return;
+                }
+            }
+
+            isConnecting = true;
+            connectSourceNode = nodeId;
+            connectSourcePort = portPos;
+            connectPoints = [];
+            connectAlt = false;
+            connectCursor = getPortCoords(nodeId, portPos);
+
+            tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            tempLine.setAttribute('stroke', '#38bdf8');
+            tempLine.setAttribute('stroke-width', '2.5');
+            tempLine.setAttribute('stroke-dasharray', '5,5');
+            tempLine.setAttribute('fill', 'none');
+            connectorSvg.appendChild(tempLine);
+            updateTempLine();
+            if (isFreeMode) document.getElementById('connectBar').style.display = 'flex';
+
+            function onConnectingMove(ev) {
+                const rect = canvas.getBoundingClientRect();
+                connectCursor = toCanvas(ev);
+                connectAlt = ev.altKey;
+                updateTempLine();
+            }
+
+            function cleanup() {
+                window.removeEventListener('pointermove', onConnectingMove);
+                window.removeEventListener('pointerup', onConnectingUp);
+                if (tempLine) { tempLine.remove(); tempLine = null; }
+                isConnecting = false;
+                connectCleanup = null;
+                document.getElementById('connectBar').style.display = 'none';
+            }
+            connectCleanup = cleanup;
+
+            function onConnectingUp(ev) {
+                const targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
+                if (isFreeMode && !(targetEl && container.contains(targetEl))) return; // arayüz düğmelerine basınca köşe ekleme
+                const nodeEl = targetEl && targetEl.closest('.flow-node');
+                const rect = canvas.getBoundingClientRect();
+                const pt = toCanvas(ev);
+
+                if (isFreeMode) {
+                    if (nodeEl && nodeEl.id === nodeId) return;          // başlangıç şekli: yok say
+                    if (!nodeEl) {                                        // boş alan: köşe noktası ekle, devam et
+                        connectPoints.push(nextPoint(pt, ev.altKey));
+                        updateTempLine();
+                        return;
+                    }
+                }
+
+                const pts = connectPoints.slice();
+                cleanup();
+                if (nodeEl && nodeEl.id !== nodeId) {
+                    const portEl = targetEl.closest('.port');
+                    const toPort = portEl ? portEl.dataset.port : nearestPort(nodeEl.id, pt);
+                    const finalPts = pts.length ? finalizePoints(pts, toPort, getPortCoords(nodeEl.id, toPort), ev.altKey) : [];
+                    addConnection(nodeId, portPos, nodeEl.id, toPort, '', true, finalPts);
+                }
+            }
+
+            window.addEventListener('pointermove', onConnectingMove);
+            window.addEventListener('pointerup', onConnectingUp);
+        }
+
+        function snap(v) { return snapOn ? Math.round(v / 12) * 12 : v; }
+
+        function nextPoint(pt, alt) {
+            const prev = connectPoints.length ? connectPoints[connectPoints.length - 1] : getPortCoords(connectSourceNode, connectSourcePort);
+            let x = snap(pt.x), y = snap(pt.y);
+            if (!alt) { if (Math.abs(x - prev.x) >= Math.abs(y - prev.y)) y = prev.y; else x = prev.x; }
+            return { x: Math.round(x), y: Math.round(y) };
+        }
+
+        function finalizePoints(pts, toPort, p2, alt) {
+            const out = pts.slice();
+            if (alt) return out;
+            const last = out[out.length - 1];
+            const vert = toPort === 'top' || toPort === 'bottom';
+            if (vert && Math.abs(last.x - p2.x) > 0.5) out.push({ x: p2.x, y: last.y });
+            else if (!vert && Math.abs(last.y - p2.y) > 0.5) out.push({ x: last.x, y: p2.y });
+            return out;
+        }
+
+        function nearestPort(nodeId, pt) {
+            let best = 'top', bestD = Infinity;
+            ['top', 'bottom', 'left', 'right'].forEach(p => {
+                const c = getPortCoords(nodeId, p);
+                const d = Math.hypot(c.x - pt.x, c.y - pt.y);
+                if (d < bestD) { bestD = d; best = p; }
+            });
+            return best;
+        }
+
+        function updateTempLine() {
+            if (!tempLine) return;
+            const start = getPortCoords(connectSourceNode, connectSourcePort);
+            const end = isFreeMode ? nextPoint(connectCursor, connectAlt) : connectCursor;
+            const pts = [start, ...(isFreeMode ? connectPoints : []), end];
+            tempLine.setAttribute('d', pts.map((p, i) => (i ? 'L ' : 'M ') + p.x + ' ' + p.y).join(' '));
+        }
+
+        function handleConnectingKey(e) {
+            if (e.key === 'Escape') { if (connectCleanup) connectCleanup(); }
+            else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); connectPoints.pop(); updateTempLine(); }
+        }
+
+        function toggleFreeMode() {
+            isFreeMode = !isFreeMode;
+            document.getElementById('freeToolBtn').classList.toggle('active', isFreeMode);
+            container.classList.toggle('free-mode', isFreeMode);
+            if (isFreeMode && !freeHintShown) {
+                freeHintShown = true;
+                showToast('Serbest bağlantı: mavi noktadan başlayın, köşe için boş alana tıklayın, bitirmek için hedef şekle tıklayın (Esc: iptal, Backspace: son köşeyi sil; alttaki düğmeleri de kullanabilirsiniz)', false);
+            }
+        }
+
+        function toggleSnap() {
+            snapOn = !snapOn;
+            document.getElementById('snapToolBtn').classList.toggle('active', snapOn);
+        }
+
+        function handleTemplateChange(sel) {
+            closeSidebar();
+            const key = sel.value;
+            sel.value = '';
+            if (!key) return;
+            if (nodes.length && !confirm('Mevcut şema silinip şablon yüklensin mi? (Geri Al ile döndürülebilir)')) return;
+            loadTemplate(key);
+        }
+
+        function addConnection(fromId, fromPort, toId, toPort, label = '', shouldSave = true, points = null) {
+            // Kural Denetimi
+            const errorReason = validateConnectionRules(fromId, toId);
+            if (errorReason) {
+                showToast(errorReason);
+                return;
+            }
+
+            // Karar kutusundan çıkıyorsa otomatik Evet / Hayır etiketi ata
+            const fromNode = nodes.find(n => n.id === fromId);
+            if (fromNode && fromNode.type === 'decision' && !label) {
+                const existingOut = connections.filter(c => c.from === fromId);
+                if (existingOut.length === 0) {
+                    label = 'Evet';
+                } else {
+                    label = 'Hayır';
+                }
+            }
+
+            if (shouldSave) saveState();
+
+            const connId = 'conn_' + (connectionCounter++);
+            connections.push({
+                id: connId,
+                from: fromId,
+                fromPort,
+                to: toId,
+                toPort,
+                label,
+                points: (points || []).map(p => ({ x: p.x, y: p.y }))
+            });
+            renderConnections();
+            selectConnection(connId);
+        }
+
+        function getPortCoords(nodeId, port) {
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node) return { x: 0, y: 0 };
+            switch (port) {
+                case 'top': return { x: node.x + node.w / 2, y: node.y };
+                case 'bottom': return { x: node.x + node.w / 2, y: node.y + node.h };
+                case 'left': return { x: node.x, y: node.y + node.h / 2 };
+                case 'right': return { x: node.x + node.w, y: node.y + node.h / 2 };
+                default: return { x: node.x + node.w / 2, y: node.y + node.h };
+            }
+        }
+
+        const DIRS = { top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0] };
+
+        function autoPoints(conn, p1, p2) {
+            const a = DIRS[conn.fromPort] || DIRS.bottom, b = DIRS[conn.toPort] || DIRS.top, S = 32;
+            const dot = a[0] * b[0] + a[1] * b[1];
+            const s1 = { x: p1.x + a[0] * S, y: p1.y + a[1] * S };
+            const s2 = { x: p2.x + b[0] * S, y: p2.y + b[1] * S };
+            const horiz = a[0] !== 0;
+            if (dot === -1) { // karşılıklı yüzler
+                const ahead = (p2.x - p1.x) * a[0] + (p2.y - p1.y) * a[1] > 0;
+                const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+                if (ahead) return horiz ? [{ x: mx, y: p1.y }, { x: mx, y: p2.y }] : [{ x: p1.x, y: my }, { x: p2.x, y: my }];
+                if (horiz) { const m = Math.abs(p1.y - p2.y) < 10 ? p1.y + 70 : my; return [s1, { x: s1.x, y: m }, { x: s2.x, y: m }, s2]; }
+                const m = Math.abs(p1.x - p2.x) < 10 ? p1.x + 90 : mx;
+                return [s1, { x: m, y: s1.y }, { x: m, y: s2.y }, s2];
+            }
+            if (dot === 1) { // aynı yüz (U şekli)
+                if (horiz) { const x = a[0] > 0 ? Math.max(p1.x, p2.x) + S : Math.min(p1.x, p2.x) - S; return [{ x, y: p1.y }, { x, y: p2.y }]; }
+                const y = a[1] > 0 ? Math.max(p1.y, p2.y) + S : Math.min(p1.y, p2.y) - S;
+                return [{ x: p1.x, y }, { x: p2.x, y }];
+            }
+            // dik yüzler (L şekli)
+            const c = horiz ? { x: p2.x, y: p1.y } : { x: p1.x, y: p2.y };
+            const ok = (c.x - p1.x) * a[0] + (c.y - p1.y) * a[1] > 0 && (c.x - p2.x) * b[0] + (c.y - p2.y) * b[1] > 0;
+            if (ok) return [c];
+            return horiz ? [s1, { x: s1.x, y: s2.y }, s2] : [s1, { x: s2.x, y: s1.y }, s2];
+        }
+
+        function simplify(pts) {
+            const out = [];
+            pts.forEach(p => { const l = out[out.length - 1]; if (!l || Math.abs(l.x - p.x) > 0.5 || Math.abs(l.y - p.y) > 0.5) out.push(p); });
+            for (let i = out.length - 2; i > 0; i--) {
+                const a = out[i - 1], b = out[i], c = out[i + 1];
+                if ((Math.abs(a.x - b.x) < 0.5 && Math.abs(b.x - c.x) < 0.5) || (Math.abs(a.y - b.y) < 0.5 && Math.abs(b.y - c.y) < 0.5)) out.splice(i, 1);
+            }
+            return out;
+        }
+
+        function connectionPoints(conn) {
+            const p1 = getPortCoords(conn.from, conn.fromPort);
+            const p2 = getPortCoords(conn.to, conn.toPort);
+            if (conn.points && conn.points.length) return [p1, ...conn.points, p2];
+            return simplify([p1, ...autoPoints(conn, p1, p2), p2]);
+        }
+
+        function renderConnections() {
+            const defs = connectorSvg.querySelector('defs');
+            connectorSvg.innerHTML = '';
+            connectorSvg.appendChild(defs);
+            const NS = 'http://www.w3.org/2000/svg';
+
+            connections.forEach(conn => {
+                const isSel = (selectedConnectionId === conn.id);
+                const custom = !!(conn.points && conn.points.length);
+                const pts = connectionPoints(conn);
+                const d = pts.map((p, i) => (i ? 'L ' : 'M ') + p.x + ' ' + p.y).join(' ');
+                const g = document.createElementNS(NS, 'g');
+                const select = (e) => { e.stopPropagation(); selectConnection(conn.id); };
+
+                const hit = document.createElementNS(NS, 'path');
+                hit.setAttribute('d', d);
+                hit.setAttribute('class', 'arrow-hit');
+                hit.addEventListener('click', select);
+                g.appendChild(hit);
+
+                const path = document.createElementNS(NS, 'path');
+                path.setAttribute('d', d);
+                path.setAttribute('class', `arrow-line ${isSel ? 'selected' : ''}`);
+                path.setAttribute('marker-end', isSel ? 'url(#arrowHeadActive)' : 'url(#arrowHead)');
+                path.addEventListener('click', select);
+                g.appendChild(path);
+
+                if (conn.label) {
+                    let i = 0; // etiketi yeterince uzun ilk segmentin üzerine koy
+                    while (i < pts.length - 2 && Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y) < 36) i++;
+                    const a = pts[i], b = pts[i + 1];
+                    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+                    const t = Math.min(len / 2, 26) / len;
+                    const mx = a.x + (b.x - a.x) * t, my = a.y + (b.y - a.y) * t;
+                    const isV = Math.abs(b.x - a.x) < Math.abs(b.y - a.y);
+                    const text = document.createElementNS(NS, 'text');
+                    text.setAttribute('x', isV ? mx + 8 : mx);
+                    text.setAttribute('y', isV ? my + 4 : my - 7);
+                    text.setAttribute('text-anchor', isV ? 'start' : 'middle');
+                    text.setAttribute('class', 'arrow-label');
+                    text.textContent = conn.label;
+                    text.addEventListener('click', select);
+                    g.appendChild(text);
+                }
+
+                if (isSel && custom) {
+                    conn.points.forEach((pt, idx) => {
+                        const c = document.createElementNS(NS, 'circle');
+                        c.setAttribute('cx', pt.x);
+                        c.setAttribute('cy', pt.y);
+                        c.setAttribute('r', window.matchMedia('(pointer: coarse)').matches ? 11 : 6);
+                        c.setAttribute('class', 'arrow-handle');
+                        c.addEventListener('pointerdown', (e) => startHandleDrag(e, conn, idx));
+                        g.appendChild(c);
+                    });
+                }
+
+                connectorSvg.appendChild(g);
+            });
+            if (tempLine) connectorSvg.appendChild(tempLine);
+        }
+
+        // Köşe noktası sürükleme: komşu köşeler dik kalacak şekilde birlikte hareket eder
+        function startHandleDrag(e, conn, idx) {
+            e.stopPropagation();
+            e.preventDefault();
+            saveState();
+            const EPS = 0.5, pts = conn.points, pt = pts[idx];
+            const prev = pts[idx - 1], next = pts[idx + 1];
+            const ox = pt.x, oy = pt.y;
+            const prevH = prev && Math.abs(prev.y - oy) < EPS, prevV = prev && Math.abs(prev.x - ox) < EPS;
+            const nextH = next && Math.abs(next.y - oy) < EPS, nextV = next && Math.abs(next.x - ox) < EPS;
+            let lockX = false, lockY = false;
+            if (pts.length > 1) { // porta bağlı uç segment dik kalsın
+                const anchor = idx === 0 ? getPortCoords(conn.from, conn.fromPort) : (idx === pts.length - 1 ? getPortCoords(conn.to, conn.toPort) : null);
+                if (anchor) { if (Math.abs(anchor.y - oy) < EPS) lockY = true; else if (Math.abs(anchor.x - ox) < EPS) lockX = true; }
+            }
+
+            function onMove(ev) {
+                const r = canvas.getBoundingClientRect();
+                const x = lockX ? ox : Math.round(snap(toCanvas(ev).x));
+                const y = lockY ? oy : Math.round(snap(toCanvas(ev).y));
+                pt.x = x; pt.y = y;
+                if (prev) { if (prevH) prev.y = y; else if (prevV) prev.x = x; }
+                if (next) { if (nextH) next.y = y; else if (nextV) next.x = x; }
+                renderConnections();
+            }
+            function onUp() {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+            }
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        }
+
+        function editCornersSelected() {
+            const conn = connections.find(c => c.id === selectedConnectionId);
+            if (!conn) return;
+            if (conn.points && conn.points.length) { showToast('Bu bağlantı zaten serbest düzenlenebilir: mavi noktaları sürükleyin.', false); return; }
+            const pts = connectionPoints(conn);
+            if (pts.length <= 2) { showToast('Düz bağlantıda köşe yok. Köşeli yol için Serbest Bağlantı modunu kullanın.'); return; }
+            saveState();
+            conn.points = pts.slice(1, -1).map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+            renderConnections();
+        }
+
+        function resetCornersSelected() {
+            const conn = connections.find(c => c.id === selectedConnectionId);
+            if (!conn || !(conn.points && conn.points.length)) return;
+            saveState();
+            conn.points = [];
+            renderConnections();
+        }
+
+        // SELECTIONS & INSPECTOR
+        function selectNode(id) {
+            selectedNodeId = id;
+            selectedConnectionId = null;
+
+            document.querySelectorAll('.flow-node').forEach(el => {
+                el.classList.toggle('selected', el.id === id);
+            });
+            renderConnections();
+            updateInspector();
+        }
+
+        function selectConnection(id) {
+            selectedConnectionId = id;
+            selectedNodeId = null;
+
+            document.querySelectorAll('.flow-node').forEach(el => el.classList.remove('selected'));
+            renderConnections();
+            updateInspector();
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (e.target === canvas || e.target === connectorSvg) {
+                selectedNodeId = null;
+                selectedConnectionId = null;
+                document.querySelectorAll('.flow-node').forEach(el => el.classList.remove('selected'));
+                renderConnections();
+                updateInspector();
+            }
+        });
+
+        function updateInspector() {
+            document.querySelector('.inspector').classList.toggle('open', !!(selectedNodeId || selectedConnectionId));
+            textDirty = false;
+            const nodeInsp = document.getElementById('nodeInspector');
+            const edgeInsp = document.getElementById('edgeInspector');
+            const emptyInsp = document.getElementById('emptyInspector');
+
+            if (selectedNodeId) {
+                const node = nodes.find(n => n.id === selectedNodeId);
+                if (node) {
+                    nodeInsp.style.display = 'block';
+                    edgeInsp.style.display = 'none';
+                    emptyInsp.style.display = 'none';
+                    document.getElementById('nodeTextInput').value = node.text;
+                    document.getElementById('nodeTypeInput').value = shapeConfigs[node.type].type;
+                    return;
+                }
+            } else if (selectedConnectionId) {
+                const conn = connections.find(c => c.id === selectedConnectionId);
+                if (conn) {
+                    nodeInsp.style.display = 'none';
+                    edgeInsp.style.display = 'block';
+                    emptyInsp.style.display = 'none';
+                    document.getElementById('arrowTextInput').value = conn.label || '';
+                    return;
+                }
+            }
+
+            nodeInsp.style.display = 'none';
+            edgeInsp.style.display = 'none';
+            emptyInsp.style.display = 'block';
+        }
+
+        function updateSelectedText() {
+            if (!selectedNodeId) return;
+            const node = nodes.find(n => n.id === selectedNodeId);
+            if (node) {
+                if (!textDirty) { saveState(); textDirty = true; }
+                node.text = document.getElementById('nodeTextInput').value;
+                const el = document.getElementById(node.id);
+                if (el) el.querySelector('.flow-text').textContent = node.text;
+            }
+        }
+
+        function updateSelectedArrowText() {
+            if (!selectedConnectionId) return;
+            const conn = connections.find(c => c.id === selectedConnectionId);
+            if (conn) {
+                if (!textDirty) { saveState(); textDirty = true; }
+                conn.label = document.getElementById('arrowTextInput').value;
+                renderConnections();
+            }
+        }
+
+        function setArrowLabel(lbl) {
+            if (!selectedConnectionId) return;
+            textDirty = false;
+            document.getElementById('arrowTextInput').value = lbl;
+            updateSelectedArrowText();
+        }
+
+        function deleteSelected() {
+            if (selectedNodeId) {
+                saveState();
+                nodes = nodes.filter(n => n.id !== selectedNodeId);
+                connections = connections.filter(c => c.from !== selectedNodeId && c.to !== selectedNodeId);
+                const el = document.getElementById(selectedNodeId);
+                if (el) el.remove();
+                selectedNodeId = null;
+                renderConnections();
+                updateInspector();
+            } else if (selectedConnectionId) {
+                saveState();
+                connections = connections.filter(c => c.id !== selectedConnectionId);
+                selectedConnectionId = null;
+                renderConnections();
+                updateInspector();
+            }
+        }
+
+        function clearCanvas() {
+            if (confirm('Tüm akış şemasını temizlemek istediğinize emin misiniz?')) {
+                saveState();
+                nodes = [];
+                connections = [];
+                selectedNodeId = null;
+                selectedConnectionId = null;
+                canvas.querySelectorAll('.flow-node').forEach(el => el.remove());
+                renderConnections();
+                updateInspector();
+            }
+        }
+
+        // AKIŞ ŞEMASI KURAL & MANTIK DENETİMİ (AUDIT MODULE)
+        function runFlowchartAudit() {
+            const list = document.getElementById('auditResultsList');
+            list.innerHTML = '';
+            const modal = document.getElementById('auditModal');
+
+            const issues = [];
+
+            // 1. Düğüm Sayısı Kontrolü
+            if (nodes.length === 0) {
+                issues.push({
+                    type: 'error',
+                    title: 'Diyagram Boş',
+                    desc: 'Çalışma alanında henüz hiçbir akış şeması sembolü bulunmuyor.'
+                });
+                renderAuditList(issues);
+                document.getElementById('runSection').innerHTML = '';
+                modal.classList.add('show');
+                return;
+            }
+
+            // 2. Başla Sembolü Kontrolü (Tam olarak 1 tane olmalı)
+            const startNodes = nodes.filter(n => n.type === 'terminal' && /başla|start/i.test(n.text));
+            if (startNodes.length === 0) {
+                issues.push({
+                    type: 'error',
+                    title: 'Eksik "Başla" Sembolü',
+                    desc: 'Her akış şeması mutlaka tek bir "Başla" sembolü (elips) ile başlamalıdır.'
+                });
+            } else if (startNodes.length > 1) {
+                issues.push({
+                    type: 'error',
+                    title: 'Birden Fazla "Başla" Sembolü Var',
+                    desc: `Şemada ${startNodes.length} adet 'Başla' sembolü tespit edildi. Standart gereği sadece 1 tane olmalıdır.`
+                });
+            } else {
+                // Başla sembolüne ok girmemeli, sadece çıkmalı
+                const incomingToStart = connections.filter(c => c.to === startNodes[0].id);
+                if (incomingToStart.length > 0) {
+                    issues.push({
+                        type: 'error',
+                        title: '"Başla" Kutusuna Giriş Oku Bağlanamaz',
+                        desc: '"Başla" sembolüne dışarıdan gelen akış oku bağlanamaz; sadece çıkış oku olmalıdır.'
+                    });
+                }
+                const outgoingFromStart = connections.filter(c => c.from === startNodes[0].id);
+                if (outgoingFromStart.length === 0) {
+                    issues.push({
+                        type: 'warning',
+                        title: '"Başla" Kutusundan Çıkış Oku Yok',
+                        desc: '"Başla" sembolü sonraki ilk adıma (genelde veri girişi) bir okla bağlanmalıdır.'
+                    });
+                }
+            }
+
+            // 3. Dur / Bitiş Sembolü Kontrolü
+            const endNodes = nodes.filter(n => n.type === 'terminal' && /dur|bitir|end/i.test(n.text));
+            if (endNodes.length === 0) {
+                issues.push({
+                    type: 'error',
+                    title: 'Eksik "Dur" Sembolü',
+                    desc: 'Akış şemasının sonlandığını belirten en az bir "Dur" (elips) sembolü bulunmalıdır.'
+                });
+            } else {
+                // Dur sembolünden ok çıkmamalı
+                endNodes.forEach(endN => {
+                    const outgoing = connections.filter(c => c.from === endN.id);
+                    if (outgoing.length > 0) {
+                        issues.push({
+                            type: 'error',
+                            title: '"Dur" Kutusundan Çıkış Oku Çıkamaz',
+                            desc: `"${endN.text}" sembolü bitiş noktasıdır, buradan başka bir şekle ok çıkamaz.`
+                        });
+                    }
+                });
+            }
+
+            // 4. Askıda Kalan / Bağlantısız Düğümler
+            nodes.forEach(node => {
+                const incoming = connections.filter(c => c.to === node.id);
+                const outgoing = connections.filter(c => c.from === node.id);
+                
+                // Tamamen bağımsız
+                if (incoming.length === 0 && outgoing.length === 0) {
+                    issues.push({
+                        type: 'error',
+                        title: `Bağlantısız Şekil: "${node.text}"`,
+                        desc: 'Bu şekle ne giren ne de çıkan hiçbir akış oku yok. Akışa dahil edilmelidir.'
+                    });
+                }
+            });
+
+            // 5. Karar (Eşkenar Dörtgen) Kontrolleri
+            const decisionNodes = nodes.filter(n => n.type === 'decision');
+            decisionNodes.forEach(decNode => {
+                const outgoing = connections.filter(c => c.from === decNode.id);
+                if (outgoing.length < 2) {
+                    issues.push({
+                        type: 'warning',
+                        title: `Eksik Karar Kolu: "${decNode.text}"`,
+                        desc: 'Karar (eşkenar dörtgen) sembolü mutlaka en az iki kola ayrılmalıdır (Evet ve Hayır).'
+                    });
+                } else {
+                    // Etiket kontrolü
+                    const hasLabels = outgoing.some(c => /^\s*(evet|e|doğru|true|yes|y)\s*$/i.test(c.label || '')) &&
+                                      outgoing.some(c => /^\s*(hayır|h|yanlış|false|no|n)\s*$/i.test(c.label || ''));
+                    if (!hasLabels) {
+                        issues.push({
+                            type: 'warning',
+                            title: `Karar Oku Etiketleri Eksik: "${decNode.text}"`,
+                            desc: 'Karar kutusundan çıkan oklara sağ panelden "Evet" ve "Hayır" etiketleri atanmalıdır.'
+                        });
+                    }
+                }
+            });
+
+            // Başarılı durumu
+            if (issues.length === 0) {
+                issues.push({
+                    type: 'success',
+                    title: 'Mükemmel! Tüm Standart Kurallar Sağlandı',
+                    desc: 'Akış şemanızda başlangıç, bitiş, karar kolları ve bağlantılar kurallara tamamen uygun.'
+                });
+            }
+
+            renderAuditList(issues);
+            modal.classList.add('show');
+            buildRunSection(issues.some(i => i.type === 'error'));
+        }
+
+        function renderAuditList(issues) {
+            const list = document.getElementById('auditResultsList');
+            list.innerHTML = '';
+            issues.forEach(item => {
+                const el = document.createElement('div');
+                el.className = `audit-item ${item.type}`;
+                const icon = item.type === 'success' ? '✅' : (item.type === 'error' ? '❌' : '⚠️');
+                el.innerHTML = `
+                    <div class="audit-icon">${icon}</div>
+                    <div class="audit-content">
+                        <div class="audit-title">${item.title}</div>
+                        <div class="audit-desc">${item.desc}</div>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        function closeAuditModal(e) {
+            document.getElementById('auditModal').classList.remove('show');
+        }
+
+        // ---- ALGORİTMA ÇALIŞTIRICI ----
+        const MATHFN = { sqrt: Math.sqrt, abs: Math.abs, pow: Math.pow, sin: Math.sin, cos: Math.cos, tan: Math.tan, floor: Math.floor, ceil: Math.ceil, round: Math.round, min: Math.min, max: Math.max, log: Math.log, exp: Math.exp, PI: Math.PI };
+        const IDENT_RE = /^[\p{L}_][\p{L}\p{N}_]*$/u;
+        const YES_RE = /^\s*(evet|e|doğru|true|yes|y)\s*$/iu, NO_RE = /^\s*(hayır|h|yanlış|false|no|n)\s*$/iu;
+        let lastInputs = {};
+
+        function escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function normName(n) { return n.trim().replace(/[₀-₉]/g, c => String(c.charCodeAt(0) - 8320)); }
+        function fmtVal(v) { return typeof v === 'number' ? (Number.isInteger(v) ? String(v) : String(+v.toFixed(10))) : String(v); }
+
+        function rewritePow(e) {
+            const re = /(²|³|\^\s*([\p{L}\p{N}_.]+))/u;
+            let m;
+            while ((m = re.exec(e))) {
+                const exp = m[1] === '²' ? '2' : m[1] === '³' ? '3' : m[2];
+                const i = m.index;
+                let start;
+                if (e[i - 1] === ')') {
+                    let dep = 0;
+                    for (start = i - 1; start >= 0; start--) { if (e[start] === ')') dep++; else if (e[start] === '(') { dep--; if (!dep) break; } }
+                    while (start > 0 && /[\p{L}\p{N}_]/u.test(e[start - 1])) start--;
+                } else {
+                    start = i;
+                    while (start > 0 && /[\p{L}\p{N}_.]/u.test(e[start - 1])) start--;
+                }
+                e = e.slice(0, start) + 'pow(' + e.slice(start, i) + ',' + exp + ')' + e.slice(i + m[0].length);
+            }
+            return e;
+        }
+
+        function toJsExpr(expr, vars, isCond) {
+            const names = Object.keys(vars);
+            let e = expr.replace(/[“”]/g, '"').replace(/[₀-₉]/g, c => String(c.charCodeAt(0) - 8320))
+                .replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/≠|<>/g, '!=')
+                .replace(/√\s*(\([^)]*\)|[\p{L}\p{N}_.]+)/gu, 'sqrt($1)');
+            return e.split(/("(?:[^"\\]|\\.)*"|'[^']*')/).map((seg, idx) => {
+                if (idx % 2) return seg; // metin sabiti
+                seg = seg.replace(/\bve\b/giu, '&&').replace(/\bveya\b/giu, '||').replace(/\bdeğil\b/giu, '!');
+                if (isCond) seg = seg.replace(/(?<![<>!=])=(?!=)/g, '==');
+                seg = rewritePow(seg);
+                seg = seg.replace(/(?<![\p{L}\p{N}_.])(\d+(?:\.\d+)?)\s*(?=[\p{L}(])/gu, '$1*').replace(/\)\s*(?=[\p{L}\p{N}(])/gu, ')*');
+                return seg.replace(/[\p{L}_][\p{L}\p{N}_]*/gu, (id, off, whole) => {
+                    const nextCh = (whole.slice(off + id.length).match(/^\s*(.)/) || [])[1];
+                    if (id in MATHFN && !(id in vars)) return id;
+                    if (id in vars) return nextCh === '(' ? id + '*' : id;
+                    if (id.length > 1 && [...id].every(ch => names.includes(ch))) return [...id].join('*');
+                    return id;
+                });
+            }).join('');
+        }
+
+        function evalExpr(expr, vars, isCond) {
+            const js = toJsExpr(expr, vars, isCond);
+            return new Function('__s', 'with(__s){return (' + js + ');}')(Object.assign({}, MATHFN, vars));
+        }
+
+        function splitTop(text) {
+            const parts = []; let cur = '', depth = 0, q = null;
+            for (const ch of text) {
+                if (q) { cur += ch; if (ch === q) q = null; continue; }
+                if (ch === '"' || ch === "'" || ch === '“') { q = ch === '“' ? '”' : ch; cur += ch; continue; }
+                if (ch === '(') depth++; else if (ch === ')') depth--;
+                if ((ch === ',' && depth === 0) || ch === '\n' || ch === ';') { parts.push(cur); cur = ''; } else cur += ch;
+            }
+            parts.push(cur);
+            return parts.map(x => x.trim()).filter(Boolean);
+        }
+
+        function friendlyError(e) {
+            if (e instanceof ReferenceError) { const m = String(e.message).match(/^(\S+) is not defined/); return `"${m ? m[1] : '?'}" değişkeni tanımlanmadan kullanıldı.`; }
+            if (e instanceof SyntaxError) return 'ifade yorumlanamadı, yazımı kontrol edin.';
+            return e.message;
+        }
+
+        function inputNames(text) {
+            return splitTop(text.replace(/^\s*(?:oku|gir|giriş|read|input|scanf)(?:\s*:\s*|\s+)/iu, '')).map(normName).filter(n => IDENT_RE.test(n));
+        }
+
+        function execProcess(text, vars) {
+            splitTop(text).forEach(part => {
+                let m = part.match(/^([\p{L}_][\p{L}\p{N}_₀-₉]*)\s*(\+=|-=|\*=|\/=|<-|←|:=|=)\s*(.+)$/su);
+                if (m) {
+                    const v = normName(m[1]), val = evalExpr(m[3], vars);
+                    const op = m[2];
+                    vars[v] = op === '+=' ? vars[v] + val : op === '-=' ? vars[v] - val : op === '*=' ? vars[v] * val : op === '/=' ? vars[v] / val : val;
+                } else if ((m = part.match(/^([\p{L}_][\p{L}\p{N}_₀-₉]*)\s*(\+\+|--)$/u))) {
+                    const v = normName(m[1]); vars[v] = vars[v] + (m[2] === '++' ? 1 : -1);
+                } else {
+                    throw new Error(`"${part}" bir işlem olarak yorumlanamadı (örn: C = A + B).`);
+                }
+            });
+        }
+
+        // Döngü sembolünde gövde / çıkış okunu yapıdan bul: gövde, döngüye geri dönen koldur
+        function classifyLoop(loopId, startId) {
+            const outE = connections.filter(c => c.from === loopId);
+            const reach = (from, skip) => {
+                const seen = new Set(), st = [from];
+                while (st.length) { const id = st.pop(); if (id === skip || seen.has(id)) continue; seen.add(id); connections.forEach(c => { if (c.from === id) st.push(c.to); }); }
+                return seen;
+            };
+            const entry = reach(startId, loopId);
+            const back = new Set(connections.filter(c => c.to === loopId && !entry.has(c.from)).map(c => c.from));
+            let body = null, exit = null;
+            outE.forEach(e => {
+                const r = reach(e.to, loopId);
+                if (!body && [...back].some(t => r.has(t))) body = e; else if (!exit) exit = e;
+            });
+            if (!body || !exit) { body = outE[0]; exit = outE[1]; }
+            return { back, body, exit };
+        }
+
+        function runAlgorithm(inputVals) {
+            const out = [], vars = {}, loops = {};
+            const start = nodes.find(n => n.type === 'terminal' && /başla|start/i.test(n.text));
+            if (!start) throw new Error('"Başla" sembolü bulunamadı.');
+            let cur = start, prev = null, steps = 0;
+            while (cur) {
+                if (++steps > 20000) throw new Error('Çok fazla adım çalıştı; sonsuz döngü olabilir (bir döngüde sayaç ilerlemiyor olabilir).');
+                const o = connections.filter(c => c.from === cur.id);
+                let next = o[0];
+                try {
+                    if (cur.type === 'terminal' && /dur|bitir|end/i.test(cur.text)) return { out, vars, steps };
+                    if (cur.type === 'input') {
+                        inputNames(cur.text).forEach(nm => {
+                            const raw = String(inputVals[nm] === undefined ? '' : inputVals[nm]).trim();
+                            if (raw === '') throw new Error(`"${nm}" için bir değer girin.`);
+                            const num = Number(raw.replace(',', '.'));
+                            vars[nm] = isNaN(num) ? raw : num;
+                        });
+                    } else if (cur.type === 'process') {
+                        execProcess(cur.text, vars);
+                    } else if (cur.type === 'output') {
+                        const items = splitTop(cur.text.replace(/^\s*(?:yazdır|yaz|print|write|output)(?:\s*:\s*|\s+)/iu, ''));
+                        const vals = items.map(it => { const q = it.match(/^(?:"(.*)"|'(.*)'|“(.*)”)$/su); return q ? (q[1] ?? q[2] ?? q[3]) : fmtVal(evalExpr(it, vars)); });
+                        if (out.length >= 500) throw new Error('Çıktı çok uzun (500 satır sınırı).');
+                        out.push(vals.join(' '));
+                    } else if (cur.type === 'decision') {
+                        const cond = evalExpr(cur.text.replace(/\?\s*$/, ''), vars, true);
+                        const yes = o.find(c => YES_RE.test(c.label || '')) || (o.find(c => NO_RE.test(c.label || '')) ? null : o[0]);
+                        const no = o.find(c => NO_RE.test(c.label || '')) || o.find(c => c !== yes);
+                        next = cond ? yes : no;
+                    } else if (cur.type === 'loop') {
+                        const info = loops[cur.id] || (loops[cur.id] = classifyLoop(cur.id, start.id));
+                        const spec = splitTop(cur.text);
+                        const m = (spec[0] || '').match(/^([\p{L}_][\p{L}\p{N}_₀-₉]*)\s*(?:=|<-|←|:=)\s*(.+)$/su);
+                        if (!m || spec.length < 2) throw new Error('Döngü metni "i = 1, N, 1" biçiminde olmalı.');
+                        const v = normName(m[1]);
+                        const step = spec[2] ? evalExpr(spec[2], vars) : 1;
+                        if (prev && info.back.has(prev.id)) vars[v] = vars[v] + step; else vars[v] = evalExpr(m[2], vars);
+                        const end = evalExpr(spec[1], vars);
+                        next = (step >= 0 ? vars[v] <= end : vars[v] >= end) ? info.body : info.exit;
+                    }
+                } catch (err) {
+                    throw new Error(`"${cur.text.replace(/\n/g, ' ')}" şeklinde: ${friendlyError(err)}`);
+                }
+                if (!next) throw new Error(`"${cur.text.replace(/\n/g, ' ')}" şeklinden çıkan uygun bir ok yok; akış "Dur"a ulaşmadan bitti.`);
+                prev = cur;
+                cur = nodes.find(n => n.id === next.to);
+            }
+            return { out, vars, steps };
+        }
+
+        function buildRunSection(hasErrors) {
+            const box = document.getElementById('runSection');
+            const names = [];
+            nodes.filter(n => n.type === 'input').sort((a, b) => a.y - b.y || a.x - b.x).forEach(n => inputNames(n.text).forEach(nm => { if (!names.includes(nm)) names.push(nm); }));
+            const defs = names.length === 1 ? [5] : [1, -3, 2, 5, 4, 3, 2, 1];
+            names.forEach((nm, i) => { if (lastInputs[nm] === undefined) lastInputs[nm] = defs[i % defs.length]; });
+            box.innerHTML = `<div class="run-title">▶ Algoritma Çıktısı</div>` +
+                (names.length ? `<div class="run-inputs">${names.map(nm => `<label>${escHtml(nm)}<input class="form-input run-input" data-var="${escHtml(nm)}" value="${escHtml(lastInputs[nm])}"></label>`).join('')}</div>` : '') +
+                `<button class="tool-btn success" onclick="executeFlowchart()">▶ Çalıştır</button>` +
+                `<pre class="run-output" id="runOutput"></pre><div class="run-vars" id="runVars"></div>`;
+            if (hasErrors) {
+                document.getElementById('runOutput').textContent = 'Şemadaki hatalar giderilince otomatik çalışır. Yine de ▶ Çalıştır ile deneyebilirsiniz.';
+            } else {
+                executeFlowchart();
+            }
+        }
+
+        function executeFlowchart() {
+            document.querySelectorAll('.run-input').forEach(el => { lastInputs[el.dataset.var] = el.value; });
+            const outEl = document.getElementById('runOutput'), varsEl = document.getElementById('runVars');
+            try {
+                const r = runAlgorithm(lastInputs);
+                outEl.className = 'run-output';
+                outEl.textContent = r.out.length ? r.out.join('\n') : '(Algoritma çalıştı ancak hiçbir değer yazdırmadı.)';
+                varsEl.textContent = 'Son değişken değerleri: ' + (Object.keys(r.vars).map(k => k + ' = ' + fmtVal(r.vars[k])).join(', ') || '—') + ' · ' + r.steps + ' adım';
+            } catch (err) {
+                outEl.className = 'run-output err';
+                outEl.textContent = '⚠ ' + friendlyError(err);
+                varsEl.textContent = '';
+            }
+        }
+
+        // ---- MOBİL / YAKINLAŞTIRMA ----
+        let zoom = 1, addCount = 0;
+
+        function toCanvas(e) {
+            const r = canvas.getBoundingClientRect();
+            return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom };
+        }
+
+        function setZoom(z) {
+            z = Math.min(1.6, Math.max(0.3, z));
+            const cx = (container.scrollLeft + container.clientWidth / 2) / zoom;
+            const cy = (container.scrollTop + container.clientHeight / 2) / zoom;
+            zoom = z;
+            canvas.style.transformOrigin = '0 0';
+            canvas.style.transform = `scale(${z})`;
+            container.scrollLeft = cx * z - container.clientWidth / 2;
+            container.scrollTop = cy * z - container.clientHeight / 2;
+            document.getElementById('zoomLabel').textContent = Math.round(z * 100) + '%';
+        }
+        function zoomBy(f) { setZoom(zoom * f); }
+
+        function fitView() {
+            if (!nodes.length) return;
+            const x0 = Math.min(...nodes.map(n => n.x)), x1 = Math.max(...nodes.map(n => n.x + n.w));
+            const y0 = Math.min(...nodes.map(n => n.y)), y1 = Math.max(...nodes.map(n => n.y + n.h));
+            setZoom(Math.min(1, (container.clientWidth - 40) / (x1 - x0), (container.clientHeight - 40) / (y1 - y0)));
+            container.scrollLeft = (x0 + x1) / 2 * zoom - container.clientWidth / 2;
+            container.scrollTop = (y0 + y1) / 2 * zoom - container.clientHeight / 2;
+        }
+
+        function toggleSidebar() { document.querySelector('.sidebar').classList.toggle('open'); }
+        function closeSidebar() { document.querySelector('.sidebar').classList.remove('open'); }
+        container.addEventListener('pointerdown', closeSidebar);
+
+        function deselectAll() {
+            selectedNodeId = null;
+            selectedConnectionId = null;
+            document.querySelectorAll('.flow-node').forEach(el => el.classList.remove('selected'));
+            renderConnections();
+            updateInspector();
+        }
+
+        function undoConnectPoint() { connectPoints.pop(); updateTempLine(); }
+        function cancelConnecting() { if (connectCleanup) connectCleanup(); }
+
+        // EXAM TEMPLATES
+        function loadTemplate(tplKey) {
+            saveState();
+            nodes = [];
+            connections = [];
+            canvas.querySelectorAll('.flow-node').forEach(el => el.remove());
+
+            const startX = 1450;
+            const startY = 1100;
+
+            if (tplKey === 'quad') {
+                const n1 = addShape('terminal', startX, startY, 'Başla', false);
+                const n2 = addShape('input', startX, startY + 80, 'Oku a, b, c', false);
+                const n3 = addShape('process', startX, startY + 160, 'D = b² - 4ac', false);
+                const n4 = addShape('decision', startX, startY + 240, 'D > 0 ?', false);
+
+                const n5 = addShape('process', startX + 220, startY + 248, 'x₁=(-b+√D)/(2a)\nx₂=(-b-√D)/(2a)', false);
+                const n6 = addShape('output', startX + 220, startY + 320, 'Yaz x₁, x₂', false);
+
+                const n7 = addShape('decision', startX, startY + 350, 'D == 0 ?', false);
+                const n8 = addShape('process', startX - 220, startY + 358, 'x = -b / (2a)', false);
+                const n9 = addShape('output', startX - 220, startY + 430, 'Yaz x, "Çakışık"', false);
+
+                const n10 = addShape('output', startX, startY + 450, 'Yaz "Karmaşık Kök"', false);
+                const n11 = addShape('terminal', startX, startY + 540, 'Dur', false);
+
+                addConnection(n1.id, 'bottom', n2.id, 'top', '', false);
+                addConnection(n2.id, 'bottom', n3.id, 'top', '', false);
+                addConnection(n3.id, 'bottom', n4.id, 'top', '', false);
+                addConnection(n4.id, 'right', n5.id, 'left', 'Evet', false);
+                addConnection(n5.id, 'bottom', n6.id, 'top', '', false);
+                addConnection(n4.id, 'bottom', n7.id, 'top', 'Hayır', false);
+                addConnection(n7.id, 'left', n8.id, 'right', 'Evet', false);
+                addConnection(n8.id, 'bottom', n9.id, 'top', '', false);
+                addConnection(n7.id, 'bottom', n10.id, 'top', 'Hayır', false);
+                addConnection(n10.id, 'bottom', n11.id, 'top', '', false);
+                addConnection(n6.id, 'bottom', n11.id, 'top', '', false);
+                addConnection(n9.id, 'bottom', n11.id, 'top', '', false);
+
+            } else if (tplKey === 'fact') {
+                const n1 = addShape('terminal', startX, startY, 'Başla', false);
+                const n2 = addShape('input', startX, startY + 80, 'Oku N', false);
+                const n3 = addShape('process', startX, startY + 160, 'F = 1, i = 1', false);
+                const n4 = addShape('decision', startX, startY + 240, 'i <= N ?', false);
+                const n5 = addShape('process', startX, startY + 340, 'F = F * i\ni = i + 1', false);
+                const n6 = addShape('output', startX + 220, startY + 246, 'Yaz F', false);
+                const n7 = addShape('terminal', startX + 220, startY + 340, 'Dur', false);
+
+                addConnection(n1.id, 'bottom', n2.id, 'top', '', false);
+                addConnection(n2.id, 'bottom', n3.id, 'top', '', false);
+                addConnection(n3.id, 'bottom', n4.id, 'top', '', false);
+                addConnection(n4.id, 'bottom', n5.id, 'top', 'Evet', false);
+                addConnection(n5.id, 'left', n4.id, 'left', '', false);
+                addConnection(n4.id, 'right', n6.id, 'left', 'Hayır', false);
+                addConnection(n6.id, 'bottom', n7.id, 'top', '', false);
+
+            } else if (tplKey === 'evenodd') {
+                const n1 = addShape('terminal', startX, startY, 'Başla', false);
+                const n2 = addShape('input', startX, startY + 80, 'Oku sayi', false);
+                const n3 = addShape('decision', startX, startY + 170, 'sayi % 2 == 0 ?', false);
+                const n4 = addShape('output', startX + 180, startY + 260, 'Yaz "Çift"', false);
+                const n5 = addShape('output', startX - 180, startY + 260, 'Yaz "Tek"', false);
+                const n6 = addShape('terminal', startX, startY + 350, 'Dur', false);
+
+                addConnection(n1.id, 'bottom', n2.id, 'top', '', false);
+                addConnection(n2.id, 'bottom', n3.id, 'top', '', false);
+                addConnection(n3.id, 'right', n4.id, 'top', 'Evet', false);
+                addConnection(n3.id, 'left', n5.id, 'top', 'Hayır', false);
+                addConnection(n4.id, 'bottom', n6.id, 'top', '', false);
+                addConnection(n5.id, 'bottom', n6.id, 'top', '', false);
+
+            } else if (tplKey === 'nested') {
+                const n1 = addShape('terminal', startX, startY, 'Başla', false);
+                const n2 = addShape('input', startX, startY + 70, 'Oku N', false);
+                const n3 = addShape('process', startX, startY + 140, 'A = 0', false);
+                const n4 = addShape('loop', startX, startY + 210, 'i = 1, N, 1', false);
+                const n5 = addShape('loop', startX + 180, startY + 210, 'j = 1, N, 1', false);
+                const n6 = addShape('process', startX + 360, startY + 210, 'A = i*j + A', false);
+                const n7 = addShape('output', startX, startY + 310, 'Yaz A', false);
+                const n8 = addShape('terminal', startX, startY + 390, 'Dur', false);
+
+                addConnection(n1.id, 'bottom', n2.id, 'top', '', false);
+                addConnection(n2.id, 'bottom', n3.id, 'top', '', false);
+                addConnection(n3.id, 'bottom', n4.id, 'top', '', false);
+                addConnection(n4.id, 'right', n5.id, 'left', '', false);
+                addConnection(n5.id, 'right', n6.id, 'left', '', false);
+                addConnection(n4.id, 'bottom', n7.id, 'top', '', false);
+                addConnection(n7.id, 'bottom', n8.id, 'top', '', false);
+                addConnection(n6.id, 'bottom', n5.id, 'bottom', '', false); // iç döngü geri dönüş
+                addConnection(n5.id, 'top', n4.id, 'top', '', false);       // dış döngü geri dönüş
+            }
+
+            fitView();
+        }
+
+        window.addEventListener('load', () => {
+            container.scrollLeft = 1100;
+            container.scrollTop = 1050;
+            loadTemplate('quad');
+            undoStack = []; redoStack = [];
+        });
+
+        function exportDiagram() {
+            if (!nodes.length) { showToast('Kaydedilecek bir şema yok.'); return; }
+            const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const PAD = 40;
+            const connPts = connections.map(c => connectionPoints(c));
+            const xs = [], ys = [];
+            nodes.forEach(n => { xs.push(n.x, n.x + n.w); ys.push(n.y, n.y + n.h); });
+            connPts.forEach(pts => pts.forEach(p => { xs.push(p.x); ys.push(p.y); }));
+            const minX = Math.min(...xs) - PAD, minY = Math.min(...ys) - PAD;
+            const W = Math.ceil(Math.max(...xs) + PAD - minX), H = Math.ceil(Math.max(...ys) + PAD - minY);
+
+            let body = '';
+            connections.forEach((c, i) => {
+                const pts = connPts[i];
+                body += `<path d="${pts.map((p, k) => (k ? 'L' : 'M') + p.x + ' ' + p.y).join(' ')}" fill="none" stroke="#94a3b8" stroke-width="2.2" marker-end="url(#ah)"/>`;
+                if (c.label) {
+                    let k = 0;
+                    while (k < pts.length - 2 && Math.hypot(pts[k + 1].x - pts[k].x, pts[k + 1].y - pts[k].y) < 36) k++;
+                    const a = pts[k], b = pts[k + 1], len = Math.hypot(b.x - a.x, b.y - a.y) || 1, t = Math.min(len / 2, 26) / len;
+                    const mx = a.x + (b.x - a.x) * t, my = a.y + (b.y - a.y) * t;
+                    const isV = Math.abs(b.x - a.x) < Math.abs(b.y - a.y);
+                    body += `<text x="${isV ? mx + 8 : mx}" y="${isV ? my + 4 : my - 7}" text-anchor="${isV ? 'start' : 'middle'}" font-size="11" font-weight="bold" fill="#fbbf24" stroke="#090d16" stroke-width="4" stroke-linejoin="round" paint-order="stroke">${esc(c.label)}</text>`;
+                }
+            });
+            nodes.forEach(n => {
+                const maxChars = Math.max(6, Math.floor(n.w * 0.8 / 7.2));
+                const lines = [];
+                String(n.text).split('\n').forEach(par => {
+                    let cur = '';
+                    par.split(' ').forEach(w => {
+                        if (cur && (cur + ' ' + w).length > maxChars) { lines.push(cur); cur = w; }
+                        else cur = cur ? cur + ' ' + w : w;
+                    });
+                    lines.push(cur);
+                });
+                const lh = 17, y0 = n.h / 2 - ((lines.length - 1) * lh) / 2;
+                body += `<g transform="translate(${n.x} ${n.y})">${shapeConfigs[n.type].renderSvg(n.w, n.h)}` +
+                    lines.map((l, k) => `<text x="${n.w / 2}" y="${y0 + k * lh}" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="600" fill="#f8fafc">${esc(l)}</text>`).join('') + '</g>';
+            });
+
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${minX} ${minY} ${W} ${H}" font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif">` +
+                `<defs><marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/></marker></defs>` +
+                `<rect x="${minX}" y="${minY}" width="${W}" height="${H}" fill="#090d16"/>${body}</svg>`;
+
+            const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+            const img = new Image();
+            img.onload = () => {
+                const scale = 2, cv = document.createElement('canvas');
+                cv.width = W * scale; cv.height = H * scale;
+                const ctx = cv.getContext('2d');
+                ctx.scale(scale, scale);
+                ctx.drawImage(img, 0, 0, W, H);
+                URL.revokeObjectURL(url);
+                cv.toBlob(blob => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'akis-semasi.png';
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                    showToast('PNG indirildi.', false);
+                }, 'image/png');
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); showToast('PNG oluşturulamadı.'); };
+            img.src = url;
+        }
+    </script>
+<div id="connectBar" style="display:none; position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:250; gap:0.5rem; background:var(--surface); border:1px solid var(--accent); border-radius:12px; padding:0.5rem 0.6rem; box-shadow:0 10px 25px rgba(0,0,0,0.6);">
+    <button class="tool-btn" onclick="undoConnectPoint()">↶ Son Köşeyi Sil</button>
+    <button class="tool-btn danger" onclick="cancelConnecting()">✕ İptal</button>
+</div>
+<div class="toast-container" id="toastContainer"></div>
+</body>
+</html>
